@@ -51,6 +51,8 @@ class Shimmer:
         self.timestamp = []
         self.loop = threading.Thread(target = self.__core_loop__)
         self.is_running = 0
+        self.is_ready = 0
+        self.is_recording = 0
 
     # ----- Private methods -----
     def __wait_for_ack__(self):
@@ -71,11 +73,12 @@ class Shimmer:
 
                 self.timestamp.append(list(struct.unpack('BBB', ddata[0:3])))
                 ch_idx = 3
-                for sens in self.enabled_sensors:
-                    buff_size = struct.calcsize(self.sensors_list[sens][1])
-                    self.data_structure[sens].append(list(struct.unpack(self.sensors_list[sens][1],
-                        ddata[ch_idx : ch_idx+ buff_size])))
-                    ch_idx += buff_size
+                if self.is_recording:
+                    for sens in self.enabled_sensors:
+                        buff_size = struct.calcsize(self.sensors_list[sens][1])
+                        self.data_structure[sens].append(list(struct.unpack(self.sensors_list[sens][1],
+                            ddata[ch_idx : ch_idx+ buff_size])))
+                        ch_idx += buff_size
 
                 next_byte = self.connection.read(1)
                 if next_byte == struct.pack('B', 0xFF):
@@ -90,6 +93,7 @@ class Shimmer:
         print(f'Port opened for shimmer {self.com_port}')
 
     def enable_sensors(self):
+        self.is_ready = 0
         sensor_command = 0x00
         self.frame_length = 3
         for sens in self.enabled_sensors:
@@ -100,22 +104,21 @@ class Shimmer:
         third_byte = (sensor_command & 0xFF0000) >> 16
         self.connection.write(struct.pack('BBBB', self.commands['SET_SENSOR_COMMAND'], first_byte, second_byte, third_byte))
         self.__wait_for_ack__()
-        print('Sensors enabled')
 
     def set_sampling_rate(self):
+        self.is_ready = 0
         fs = round(32760/self.sampling_rate)
         fs = np.min([fs,65535])
         byte_low = fs&0xFF
         byte_high = (fs&0xFF00)>>8
         self.connection.write(struct.pack('BBB', 0x05, byte_low, byte_high))
         self.__wait_for_ack__()
-        print('Sampling rate set')
 
     def set_accel_range(self):
+        self.is_ready = 0
         # STILL TO ENCODE THE COMMAND
         self.connection.write(struct.pack('BBB', 0x4F, 0x00, 0x00))
         self.__wait_for_ack__()
-        print('Range set')
 
     def initialize(self):
         self.enable_sensors()
@@ -123,19 +126,23 @@ class Shimmer:
         self.set_accel_range()
         self.connection.write(struct.pack('B', self.commands['START']))
         self.__wait_for_ack__()
+        self.is_running = 1
         self.loop.start()
+        print(f'Shimmer {self.com_port} ready.')
 
     def start(self):
-        print('Recording')
-        self.flush_data()
-        self.is_running = 1
+        self.is_recording = 1
     
     def stop(self):
+        self.is_recording = 0
         self.is_running = 0
-        time.sleep(0.5)
-        print('Acquisition stopped.')
+    
+    def get_stored_data(self):
+        output_data = {}
         for key, value in self.data_structure.items():
-            self.data_structure[key] = np.array(value)
+            output_data[key] = np.array(value)
+        self.flush_data()
+        return output_data
 
     def flush_data(self):
         for sens in self.enabled_sensors:
