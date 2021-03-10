@@ -4,6 +4,7 @@ import serial
 import numpy as np
 import threading
 import time
+import pandas as pd
 
 class Shimmer:
 
@@ -13,26 +14,27 @@ class Shimmer:
     sensors_list = {
         # [0] - On command.
         # [1] - Data packet format
+        # [2] - Order in payload (NOT SURE)
 
-        'SENSOR_A_ACCEL': (0x80, 'HHH'),
-        'SENSOR_MPU9150_GYRO': (0x040, '>hhh'),
-        'SENSOR_LSM303DLHC_MAG': (0x20, '>hhh'),
-        'SENSOR_GSR': (0x04, 'H'),
-        'SENSOR_EXT_A7': (0x02, 'H'),
-        'SENSOR_EXT_A6': (0x01, 'H'),
-        'SENSOR_VBATT': (0x2000, 'H'),
-        'SENSOR_D_ACCEL': (0x1000, 'hhh'),
-        'SENSOR_EXT_A15': (0x0800, 'H'),
-        'SENSOR_INT_A1': (0x0400, 'H'),
-        'SENSOR_INT_A12': (0x0200, 'H'),
-        'SENSOR_INT_A13': (0x0100, 'H'),
-        'SENSOR_INT_A14': (0x800000, 'H'),
-        'SENSOR_BMP180_PRESSURE': (0x40000, '>II'), # CHECK
-        'SENSOR_EXG1_24BIT': (0x10, '>ii'),
-        'SENSOR_EXG2_24BIT': (0x08, '>ii'),
-        'SENSOR_EXG1_16BIT': (0x100000, '>hh'),
-        'SENSOR_EXG2_16BIT': (0x080000, '>hh'),
-        'SENSOR_BRIDGE_AMP': (0x8000, 'HH'),
+        'SENSOR_A_ACCEL': (0x80, 'HHH', 1),
+        'SENSOR_MPU9150_GYRO': (0x040, '>hhh', 2),
+        'SENSOR_LSM303DLHC_MAG': (0x20, '>hhh', 3),
+        'SENSOR_GSR': (0x04, 'H', 4),
+        'SENSOR_EXT_A7': (0x02, 'H', 5),
+        'SENSOR_EXT_A6': (0x01, 'H', 6),
+        'SENSOR_VBATT': (0x2000, 'H', 7),
+        'SENSOR_D_ACCEL': (0x1000, 'hhh', 8),
+        'SENSOR_EXT_A15': (0x0800, 'H', 9),
+        'SENSOR_INT_A1': (0x0400, 'H', 10),
+        'SENSOR_INT_A12': (0x0200, 'H', 11),
+        'SENSOR_INT_A13': (0x0100, 'H', 12),
+        'SENSOR_INT_A14': (0x800000, 'H', 13),
+        'SENSOR_BMP180_PRESSURE': (0x40000, '>II', 14), # CHECK
+        'SENSOR_EXG1_24BIT': (0x10, '>ii', 15),
+        'SENSOR_EXG2_24BIT': (0x08, '>ii', 16),
+        'SENSOR_EXG1_16BIT': (0x100000, '>hh', 17),
+        'SENSOR_EXG2_16BIT': (0x080000, '>hh', 18),
+        'SENSOR_BRIDGE_AMP': (0x8000, 'HH', 19),
     }
 
     commands = {
@@ -45,6 +47,7 @@ class Shimmer:
     # ----- Constructor -----
     def __init__(self, com_port, enabled_sensors, sampling_rate):
         self.com_port = com_port
+        enabled_sensors = sorted(enabled_sensors, key = lambda x: self.sensors_list[x][2])
         self.enabled_sensors = enabled_sensors
         self.sampling_rate = sampling_rate
         self.data_structure = {sens: [] for sens in enabled_sensors}
@@ -53,6 +56,7 @@ class Shimmer:
         self.is_running = 0
         self.is_ready = 0
         self.is_recording = 0
+        self.memory = []
 
     # ----- Private methods -----
     def __wait_for_ack__(self):
@@ -71,9 +75,10 @@ class Shimmer:
                 numbytes = len(ddata)
                 ddata = self.connection.read(self.frame_length)
 
-                self.timestamp.append(list(struct.unpack('BBB', ddata[0:3])))
                 ch_idx = 3
                 if self.is_recording:
+                    tmp_timestamp = list(struct.unpack('BBB', ddata[0:3]))
+                    self.timestamp.append(tmp_timestamp[0] + 256*tmp_timestamp[1] + 65536*tmp_timestamp[2])
                     for sens in self.enabled_sensors:
                         buff_size = struct.calcsize(self.sensors_list[sens][1])
                         self.data_structure[sens].append(list(struct.unpack(self.sensors_list[sens][1],
@@ -137,16 +142,29 @@ class Shimmer:
         self.is_recording = 0
         self.is_running = 0
     
-    def get_stored_data(self):
+    def get_last_data(self):
         output_data = {}
         for key, value in self.data_structure.items():
             output_data[key] = np.array(value)
-        self.flush_data()
+        self.memory = output_data
         return output_data
 
     def flush_data(self):
+        self.timestamp = []
         for sens in self.enabled_sensors:
             self.data_structure[sens] = []
+
+    def save_last_data(self, filename):
+        if not self.memory:
+            self.get_last_data()
+        output_dataframe = pd.DataFrame([])
+        output_dataframe['TIME'] = self.timestamp
+        for sens in self.memory.keys():
+            for i in range(1,4):
+                tmp_df = pd.DataFrame({sens+'_'+str(i): self.memory[sens][:,i-1]})
+                output_dataframe = pd.concat([output_dataframe, tmp_df], axis=1, ignore_index=False)
+                # output_dataframe[sens+'_'+str(i)] = self.memory[sens][:,i-1]
+        output_dataframe.to_csv(filename, index=False)
 
     def disconnect(self):
         self.loop.join()
