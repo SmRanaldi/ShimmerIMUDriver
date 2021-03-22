@@ -287,15 +287,16 @@ class Shimmer:
 
     def get_orientation(self, a, g, m, q):
 
-        beta = 1
+        beta = 0.01
         sampling_period = 1/self.sampling_rate
+        quaternion_norm = lambda x: np.sqrt(np.sum([c**2 for c in quaternion.as_float_array(x)])) 
 
-        norm_a = np.norm(a)
-        if norm_a > 1e-4: a /= norm_a
-        norm_m = np.norm(m)
-        if norm_m > 1e-4: a /= norm_m
-        norm_q = np.norm(q)
-        if norm_q > 1e-4: a /= norm_q
+        norm_a = quaternion_norm(a)
+        if norm_a > 1e-6: a /= norm_a
+        norm_m = quaternion_norm(m)
+        if norm_m > 1e-6: a /= norm_m
+        norm_q = quaternion_norm(q)
+        if norm_q > 1e-6: a /= norm_q
 
         ht = quaternion.as_float_array(q * m * q.conj())
         bt = np.quaternion(0, np.sqrt(ht[1]**2 + ht[2]**2), 0, ht[3])
@@ -317,20 +318,20 @@ class Shimmer:
                        [2*(0.5 - Q[1]**2 - Q[2]**2) - A[3]]])
         fb = np.array([[2*BT[1]*(0.5-Q[2]**2 - Q[3]**2) + 2*BT[3]*(Q[1]*Q[3] - Q[0]*Q[2]) - M[1]],
                         [2*BT[1]*(Q[1]*Q[2] - Q[0]*Q[3]) + 2*BT[3]*(Q[0]*Q[1] + Q[2]*Q[3]) - M[2]],
-                        [2*BT[1]*(Q[0]*Q[2] + Q[2]*Q[3]) + 2*BT[3]*(0.5 - Q[1]**2 - Q[2]**2) - M[3]]])
+                        [2*BT[1]*(Q[0]*Q[2] + Q[1]*Q[3]) + 2*BT[3]*(0.5 - Q[1]**2 - Q[2]**2) - M[3]]])
 
         # Nabla
         fgb = np.append(fg, fb, 0)
         Jgb = np.append(Jg, Jb, 0)
         f = Jgb.transpose()@fgb
         f = np.quaternion(*f)
-        norm_f = np.norm(f)
-        if norm_f > 1e-4: f /= norm_f
+        norm_f = quaternion_norm(f)
+        if norm_f > 1e-6: f /= norm_f
 
         # Eq. 30 in the paper
         q_dot = 0.5 * q * g - beta*f
         q_next = q + sampling_period*q_dot
-        norm_q_next = np.norm(q_next)
+        norm_q_next = quaternion_norm(q_next)
         q_next /= norm_q_next
         
         return q_next
@@ -345,3 +346,11 @@ class Shimmer:
         for q in quat:
             angles_out.append(quaternion.as_euler_angles(q))
         return np.array(angles_out)
+
+    def get_rotation_axis(self):
+        quat = self.get_quaternions()
+        axis_out = []
+        for q in quat:
+            Q = quaternion.as_float_array(q)
+            axis_out.append(Q[1:]/np.sqrt(1-Q[0]**2))
+        return np.array(axis_out)

@@ -9,7 +9,7 @@ fs = 103
 t = 5
 inter_command_delay = 0.5
 com_ports = ['Com5', 'Com8', 'Com9', 'Com12']
-com_ports = ['Com5']
+com_ports = ['Com8']
 # Com5 -> EA15
 # Com8 -> D3CE
 # Com3 -> EA24 (Check)
@@ -67,13 +67,16 @@ plt.legend()
 plt.show()
 
 for s in shimmers:
-    ang = s.get_euler_angles()
-    print(ang.shape)
-    plt.figure()
-    # plt.plot(quaternion.as_float_array(quat)[:int(np.round(min_l/2)),[1,2,3]])
-    for i in range(3):
-        ang[:,i] = np.convolve(ang[:,i], np.ones(50)/50, mode='same')
-    plt.plot(ang)
+    # ang = s.get_euler_angles()
+    # ang *= 180/np.pi
+    r_axis = s.get_rotation_axis()
+    fig = plt.figure()
+    fig.add_subplot(111, projection='3d')
+    # for i in range(3):
+    #     r_axis[:,i] = np.convolve(r_axis[:,i], np.ones(50)/50, mode='same')
+    # plt.plot(ang)
+    plt.plot(r_axis[:,0],r_axis[:,1],r_axis[:,2],'ko')
+    plt.plot(0,0,0,'ro',markersize=5)
     plt.show()
 for s in shimmers:
     s.disconnect()
