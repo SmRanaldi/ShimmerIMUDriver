@@ -53,7 +53,7 @@ for s in shimmers:
     l.append(data[s.com_port]['SENSOR_A_ACCEL'].shape[0])
     plt.subplot(121)
     for i in range(0,3):
-        plt.plot(data[s.com_port]['SENSOR_A_ACCEL'][:,i])
+        plt.plot(data[s.com_port]['SENSOR_MPU9150_GYRO'][:,i])
     plt.subplot(122)
     for i in range(0,3):
         plt.plot(data[s.com_port]['SENSOR_LSM303DLHC_MAG'][:,i])
@@ -62,21 +62,22 @@ min_l = np.min(l)
 
 plt.figure()
 for s in shimmers:
-    plt.plot(data[s.com_port]['SENSOR_A_ACCEL'][:,0], label = s.com_port)
+    plt.plot(data[s.com_port]['SENSOR_MPU9150_GYRO'][:,0], label = s.com_port)
 plt.legend()
 plt.show()
 
 for s in shimmers:
-    # ang = s.get_euler_angles()
-    # ang *= 180/np.pi
-    r_axis = s.get_rotation_axis()
+    ang = s.get_euler_angles()
+    ang *= 180/np.pi
+    r_axis = s.get_axis_angle()
+    print(r_axis.shape)
     fig = plt.figure()
-    fig.add_subplot(111, projection='3d')
-    # for i in range(3):
-    #     r_axis[:,i] = np.convolve(r_axis[:,i], np.ones(50)/50, mode='same')
+    fig.add_subplot(121, projection='3d')
     # plt.plot(ang)
     plt.plot(r_axis[:,0],r_axis[:,1],r_axis[:,2],'ko')
     plt.plot(0,0,0,'ro',markersize=5)
+    fig.add_subplot(122)
+    plt.plot(r_axis[:,3],'k')
     plt.show()
 for s in shimmers:
     s.disconnect()

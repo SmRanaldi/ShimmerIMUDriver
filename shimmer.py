@@ -12,6 +12,7 @@ class Shimmer:
     # ----- Parameters -----
     baud_rate = 115200
     length_calibration_packet = 21
+    NORM_THS = 1e-6
 
     sensors_list = {
         # [0] - On command.
@@ -287,16 +288,18 @@ class Shimmer:
 
     def get_orientation(self, a, g, m, q):
 
-        beta = 0.01
+        beta = 0.1
         sampling_period = 1/self.sampling_rate
         quaternion_norm = lambda x: np.sqrt(np.sum([c**2 for c in quaternion.as_float_array(x)])) 
 
         norm_a = quaternion_norm(a)
-        if norm_a > 1e-6: a /= norm_a
+        if norm_a > self.NORM_THS: a /= norm_a
         norm_m = quaternion_norm(m)
-        if norm_m > 1e-6: a /= norm_m
+        if norm_m > self.NORM_THS: a /= norm_m
         norm_q = quaternion_norm(q)
-        if norm_q > 1e-6: a /= norm_q
+        if norm_q > self.NORM_THS: a /= norm_q
+
+        g /= (180/np.pi) # Get gyro data in radians/s
 
         ht = quaternion.as_float_array(q * m * q.conj())
         bt = np.quaternion(0, np.sqrt(ht[1]**2 + ht[2]**2), 0, ht[3])
@@ -326,7 +329,7 @@ class Shimmer:
         f = Jgb.transpose()@fgb
         f = np.quaternion(*f)
         norm_f = quaternion_norm(f)
-        if norm_f > 1e-6: f /= norm_f
+        if norm_f > self.NORM_THS: f /= norm_f
 
         # Eq. 30 in the paper
         q_dot = 0.5 * q * g - beta*f
@@ -347,10 +350,15 @@ class Shimmer:
             angles_out.append(quaternion.as_euler_angles(q))
         return np.array(angles_out)
 
-    def get_rotation_axis(self):
+    def get_axis_angle(self):
         quat = self.get_quaternions()
         axis_out = []
+        angle_out = []
         for q in quat:
             Q = quaternion.as_float_array(q)
+            row = []
             axis_out.append(Q[1:]/np.sqrt(1-Q[0]**2))
-        return np.array(axis_out)
+            angle_out.append(2*np.arccos(Q[0]))
+        angle_out = np.array(angle_out)
+        axis_out = np.array(axis_out)
+        return np.concatenate((axis_out,angle_out.reshape(-1,1)), axis=1)
