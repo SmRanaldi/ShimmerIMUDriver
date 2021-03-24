@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-fs = 103
+fs = 102.4
 t = 5
 inter_command_delay = 0.5
 com_ports = ['Com5', 'Com8', 'Com9', 'Com12']
@@ -47,8 +47,8 @@ for s in shimmers:
     data[s.com_port] = s.get_last_data()
     s.save_last_data(output_path + '/data_'+s.com_port+'.csv')
     s.save_quaternions(output_path+'/quaternions_'+s.com_port+'.csv')
-    # for aa in data[s.com_port].values():
-        # print(aa.shape)
+    sampling_period = np.mean(np.diff(s.timestamp)/1000)
+    print(f"Sampling period for Shimmer {s.com_port}: {sampling_period:2f}. Theoretical sampling period: {1/fs:2f}")
     print(f"{data[s.com_port]['SENSOR_A_ACCEL'].shape[0]} samples for shimmer on {s.com_port}.")
     l.append(data[s.com_port]['SENSOR_A_ACCEL'].shape[0])
     plt.subplot(121)
@@ -58,12 +58,13 @@ for s in shimmers:
     for i in range(0,3):
         plt.plot(data[s.com_port]['SENSOR_LSM303DLHC_MAG'][:,i])
     plt.show()
+    error_value = np.max([np.mean(np.abs((data[s.com_port]['SENSOR_MPU9150_GYRO'][:np.min((200,l[-1])),i]))) for i in range(3)])
+    print(f"Gyro error for Shimmer {s.com_port}: {error_value/(180/np.pi)} rad/s")
 min_l = np.min(l)
 
 plt.figure()
 for s in shimmers:
     plt.plot(data[s.com_port]['SENSOR_A_ACCEL'], label = s.com_port)
-    # plt.plot(data[s.com_port]['SENSOR_MPU9150_GYRO'][:,0], label = s.com_port)
 plt.legend()
 plt.show()
 

@@ -13,6 +13,7 @@ class Shimmer:
     baud_rate = 115200
     length_calibration_packet = 21
     NORM_THS = 1e-10
+    BETA = np.sqrt(3/4) * 0.007# Equation 33 in the paper
 
     sensors_list = {
         # [0] - On command.
@@ -21,14 +22,14 @@ class Shimmer:
         # [3] - Number of channels
         # [4] - Calibration name (if present)
 
-        'SENSOR_A_ACCEL': (0x80, 'HHH', 1, 3, 'A_ACCEL'),
+        'SENSOR_A_ACCEL': (0x80, 'HHH', 1, 3, 'A_ACCEL'), # Low-noise
         'SENSOR_MPU9150_GYRO': (0x040, '>hhh', 2, 3, 'GYRO'),
         'SENSOR_LSM303DLHC_MAG': (0x20, '>hhh', 3, 3, 'MAG'),
         'SENSOR_GSR': (0x04, 'H', 4, 1, ''),
         'SENSOR_EXT_A7': (0x02, 'H', 5, 1, ''),
         'SENSOR_EXT_A6': (0x01, 'H', 6, 1, ''),
         'SENSOR_VBATT': (0x2000, 'H', 7, 1, ''),
-        'SENSOR_D_ACCEL': (0x1000, 'hhh', 8, 3, 'D_ACCEL'),
+        'SENSOR_D_ACCEL': (0x1000, 'hhh', 8, 3, 'D_ACCEL'), # Wide range
         'SENSOR_EXT_A15': (0x0800, 'H', 9, 1, ''),
         'SENSOR_INT_A1': (0x0400, 'H', 10, 1, ''),
         'SENSOR_INT_A12': (0x0200, 'H', 11, 1, ''),
@@ -98,7 +99,7 @@ class Shimmer:
                 ch_idx = 3
                 if self.is_recording:
                     tmp_timestamp = list(struct.unpack('BBB', ddata[0:3]))
-                    self.timestamp.append(tmp_timestamp[0] + 256*tmp_timestamp[1] + 65536*tmp_timestamp[2])
+                    self.timestamp.append(float((tmp_timestamp[0] + 256*tmp_timestamp[1] + 65536*tmp_timestamp[2])/32768 * 1000)) # In ms, from the C# API
                     for sens in self.enabled_sensors:
                         buff_size = struct.calcsize(self.sensors_list[sens][1])
                         self.data_structure[sens].append(list(struct.unpack(self.sensors_list[sens][1],
@@ -135,8 +136,9 @@ class Shimmer:
 
     def set_sampling_rate(self):
         self.is_ready = 0
-        fs = round(32760/self.sampling_rate)
-        fs = np.min([fs,65535])
+        # fs = 1024/self.sampling_rate # From the Shimmer C# API, need to check
+        # fs = int(fs)
+        fs = int(32768/self.sampling_rate) # From the Shimmer C# API
         byte_low = fs&0xFF
         byte_high = (fs&0xFF00)>>8
         self.connection.write(struct.pack('BBB', 0x05, byte_low, byte_high))
@@ -171,7 +173,6 @@ class Shimmer:
         for key, value in self.data_structure.items():
             print(key)
             output_data[key] = self.calibrate_channel(np.array(value), self.calibration[self.sensors_list[key][4]])
-            # output_data[key] *= 100 # TESTTESTTEST
         self.memory = output_data
         return output_data
 
@@ -283,16 +284,17 @@ class Shimmer:
         mag = quaternion.from_float_array(mag)
 
         tmp_orientation = np.quaternion(1,0,0,0) # Initialization
-        for i in range(n_samples):
-            tmp_orientation = self.get_orientation(acc[i], gyr[i], mag[i], tmp_orientation)
+        for i in range(1,n_samples):
+            # delta_t = 1/self.sampling_rate
+            delta_t = (self.timestamp[i] - self.timestamp[i-1])/1000 # DT in seconds.
+            tmp_orientation = self.get_orientation(acc[i], gyr[i], mag[i], tmp_orientation, delta_t)
             orientation_out.append(tmp_orientation)
 
         return orientation_out
 
-    def get_orientation(self, a, g, m, q):
+    def get_orientation(self, a, g, m, q, dt):
 
-        beta = 0.03
-        sampling_period = 1/self.sampling_rate
+        # beta = 0.03
         quaternion_norm = lambda x: np.sqrt(np.sum([c**2 for c in quaternion.as_float_array(x)])) 
 
         norm_a = quaternion_norm(a)
@@ -336,8 +338,8 @@ class Shimmer:
         # if norm_f > self.NORM_THS: f /= norm_f
 
         # Eq. 30 in the paper
-        q_dot = 0.5 * q * g - beta*f
-        q_next = q + sampling_period*q_dot
+        q_dot = 0.5 * q * g - self.BETA*f
+        q_next = q + dt*q_dot
         norm_q_next = quaternion_norm(q_next)
         q_next /= norm_q_next
         
