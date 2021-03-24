@@ -12,7 +12,7 @@ class Shimmer:
     # ----- Parameters -----
     baud_rate = 115200
     length_calibration_packet = 21
-    NORM_THS = 1e-6
+    NORM_THS = 1e-10
 
     sensors_list = {
         # [0] - On command.
@@ -220,6 +220,7 @@ class Shimmer:
         ddata = bytearray()
         ddata = self.connection.read(self.length_calibration_packet)
         self.calibration['GYRO'] = self.unpack_cal_parameters(ddata)
+        self.calibration['GYRO']['sensitivity'] = self.calibration['GYRO']['sensitivity'] / 100 # Correction
         # LN accel
         self.connection.write(struct.pack('B', self.commands['GET_MAG_CAL']))
         self.__wait_for_ack__()
@@ -239,13 +240,15 @@ class Shimmer:
         ddata = self.connection.read(self.length_calibration_packet)
         self.calibration['D_ACCEL'] = self.unpack_cal_parameters(ddata)
 
+        # print(self.calibration)
+
     def unpack_cal_parameters(self, ddata_in):
         # Bytes 0-5 -> 3 offset values (16 bit unsigned int, big endian)
         # Bytes 6-11 -> 3 sensitivity values (16 bit unsigned int, big endian)
         # Bytes 12-21 -> 9 elements of the alignment matrix (8 bit unsigned int)
         output_parameters = {}
-        output_parameters['offset'] = np.array(struct.unpack('>HHH', ddata_in[0:6]))
-        output_parameters['sensitivity'] = np.diag(np.array(struct.unpack('>HHH', ddata_in[6:12])))
+        output_parameters['offset'] = np.array(struct.unpack('>hhh', ddata_in[0:6]))
+        output_parameters['sensitivity'] = np.diag(np.array(struct.unpack('>hhh', ddata_in[6:12])))
         output_parameters['alignment'] = np.array(struct.unpack('bbbbbbbbb', ddata_in[12:])).reshape((3,3))/100
         return output_parameters
     
@@ -288,7 +291,7 @@ class Shimmer:
 
     def get_orientation(self, a, g, m, q):
 
-        beta = 0.1
+        beta = 0.03
         sampling_period = 1/self.sampling_rate
         quaternion_norm = lambda x: np.sqrt(np.sum([c**2 for c in quaternion.as_float_array(x)])) 
 
@@ -329,7 +332,8 @@ class Shimmer:
         f = Jgb.transpose()@fgb
         f = np.quaternion(*f)
         norm_f = quaternion_norm(f)
-        if norm_f > self.NORM_THS: f /= norm_f
+        f /= norm_f
+        # if norm_f > self.NORM_THS: f /= norm_f
 
         # Eq. 30 in the paper
         q_dot = 0.5 * q * g - beta*f

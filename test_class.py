@@ -9,7 +9,7 @@ fs = 103
 t = 5
 inter_command_delay = 0.5
 com_ports = ['Com5', 'Com8', 'Com9', 'Com12']
-com_ports = ['Com8']
+com_ports = ['Com5']
 # Com5 -> EA15
 # Com8 -> D3CE
 # Com3 -> EA24 (Check)
@@ -62,7 +62,8 @@ min_l = np.min(l)
 
 plt.figure()
 for s in shimmers:
-    plt.plot(data[s.com_port]['SENSOR_MPU9150_GYRO'][:,0], label = s.com_port)
+    plt.plot(data[s.com_port]['SENSOR_A_ACCEL'], label = s.com_port)
+    # plt.plot(data[s.com_port]['SENSOR_MPU9150_GYRO'][:,0], label = s.com_port)
 plt.legend()
 plt.show()
 
@@ -77,7 +78,7 @@ for s in shimmers:
     plt.plot(r_axis[:,0],r_axis[:,1],r_axis[:,2],'ko')
     plt.plot(0,0,0,'ro',markersize=5)
     fig.add_subplot(122)
-    plt.plot(r_axis[:,3],'k')
+    plt.plot(r_axis[:,3]*(180/np.pi),'k')
     plt.show()
 for s in shimmers:
     s.disconnect()
