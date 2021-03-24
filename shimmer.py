@@ -13,7 +13,8 @@ class Shimmer:
     baud_rate = 115200
     length_calibration_packet = 21
     NORM_THS = 1e-10
-    BETA = np.sqrt(3/4) * 0.007# Equation 33 in the paper
+    # BETA = np.sqrt(3/4) * 0.007# Equation 33 in the paper
+    BETA = 0.05
 
     sensors_list = {
         # [0] - On command.
@@ -171,7 +172,6 @@ class Shimmer:
     def get_last_data(self):
         output_data = {}
         for key, value in self.data_structure.items():
-            print(key)
             output_data[key] = self.calibrate_channel(np.array(value), self.calibration[self.sensors_list[key][4]])
         self.memory = output_data
         return output_data
@@ -188,7 +188,6 @@ class Shimmer:
         output_dataframe['TIME'] = self.timestamp
         for sens in self.memory.keys():
             n_channels = self.sensors_list[sens][3]
-            print(self.memory[sens].shape)
             for i in range(1,n_channels+1):
                 tmp_df = pd.DataFrame({sens+'_'+str(i): self.memory[sens][:,i-1]})
                 output_dataframe = pd.concat([output_dataframe, tmp_df], axis=1, ignore_index=False)
@@ -203,6 +202,7 @@ class Shimmer:
 
     def get_cal_parameters(self):
         tmp_ack = []
+
         # LN accel
         self.connection.write(struct.pack('B', self.commands['GET_A_ACCEL_CAL']))
         self.__wait_for_ack__()
@@ -212,6 +212,7 @@ class Shimmer:
         ddata = bytearray()
         ddata = self.connection.read(self.length_calibration_packet)
         self.calibration['A_ACCEL'] = self.unpack_cal_parameters(ddata)
+
         # Gyroscope
         self.connection.write(struct.pack('B', self.commands['GET_GYRO_CAL']))
         self.__wait_for_ack__()
@@ -222,7 +223,8 @@ class Shimmer:
         ddata = self.connection.read(self.length_calibration_packet)
         self.calibration['GYRO'] = self.unpack_cal_parameters(ddata)
         self.calibration['GYRO']['sensitivity'] = self.calibration['GYRO']['sensitivity'] / 100 # Correction
-        # LN accel
+
+        # Magnetometer
         self.connection.write(struct.pack('B', self.commands['GET_MAG_CAL']))
         self.__wait_for_ack__()
         ack_calibration = struct.pack('B', self.commands['MAG_CAL_ACK'])
@@ -231,7 +233,8 @@ class Shimmer:
         ddata = bytearray()
         ddata = self.connection.read(self.length_calibration_packet)
         self.calibration['MAG'] = self.unpack_cal_parameters(ddata)
-        # LN accel
+
+        # WR Accel
         self.connection.write(struct.pack('B', self.commands['GET_D_ACCEL_CAL']))
         self.__wait_for_ack__()
         ack_calibration = struct.pack('B', self.commands['D_ACCEL_CAL_ACK'])
@@ -283,14 +286,14 @@ class Shimmer:
         gyr = quaternion.from_float_array(gyr)
         mag = quaternion.from_float_array(mag)
 
-        tmp_orientation = np.quaternion(1,0,0,0) # Initialization
+        orientation_out.append(np.quaternion(1,0,0,0)) # Initialization
         for i in range(1,n_samples):
             # delta_t = 1/self.sampling_rate
-            delta_t = (self.timestamp[i] - self.timestamp[i-1])/1000 # DT in seconds.
-            tmp_orientation = self.get_orientation(acc[i], gyr[i], mag[i], tmp_orientation, delta_t)
+            delta_t = (self.timestamp[i] - self.timestamp[i-1])/1e3 # DT in seconds.
+            tmp_orientation = self.get_orientation(acc[i], gyr[i], mag[i], orientation_out[-1], delta_t)
             orientation_out.append(tmp_orientation)
 
-        return orientation_out
+        return orientation_out[1:]
 
     def get_orientation(self, a, g, m, q, dt):
 
@@ -298,11 +301,11 @@ class Shimmer:
         quaternion_norm = lambda x: np.sqrt(np.sum([c**2 for c in quaternion.as_float_array(x)])) 
 
         norm_a = quaternion_norm(a)
-        if norm_a > self.NORM_THS: a /= norm_a
+        if norm_a > self.NORM_THS: a = a / norm_a
         norm_m = quaternion_norm(m)
-        if norm_m > self.NORM_THS: a /= norm_m
-        norm_q = quaternion_norm(q)
-        if norm_q > self.NORM_THS: a /= norm_q
+        if norm_m > self.NORM_THS: m = m / norm_m
+        # norm_q = quaternion_norm(q)
+        # if norm_q > self.NORM_THS: a /= norm_q
 
         g /= (180/np.pi) # Get gyro data in radians/s
 
@@ -324,7 +327,7 @@ class Shimmer:
         fg = np.array([[2*(Q[1]*Q[3] - Q[0]*Q[2]) - A[1]],
                        [2*(Q[0]*Q[1] + Q[2]*Q[3]) - A[2]],
                        [2*(0.5 - Q[1]**2 - Q[2]**2) - A[3]]])
-        fb = np.array([[2*BT[1]*(0.5-Q[2]**2 - Q[3]**2) + 2*BT[3]*(Q[1]*Q[3] - Q[0]*Q[2]) - M[1]],
+        fb = np.array([[2*BT[1]*(0.5 - Q[2]**2 - Q[3]**2) + 2*BT[3]*(Q[1]*Q[3] - Q[0]*Q[2]) - M[1]],
                         [2*BT[1]*(Q[1]*Q[2] - Q[0]*Q[3]) + 2*BT[3]*(Q[0]*Q[1] + Q[2]*Q[3]) - M[2]],
                         [2*BT[1]*(Q[0]*Q[2] + Q[1]*Q[3]) + 2*BT[3]*(0.5 - Q[1]**2 - Q[2]**2) - M[3]]])
 
@@ -334,14 +337,14 @@ class Shimmer:
         f = Jgb.transpose()@fgb
         f = np.quaternion(*f)
         norm_f = quaternion_norm(f)
-        f /= norm_f
+        f = f / norm_f
         # if norm_f > self.NORM_THS: f /= norm_f
 
         # Eq. 30 in the paper
         q_dot = 0.5 * q * g - self.BETA*f
         q_next = q + dt*q_dot
         norm_q_next = quaternion_norm(q_next)
-        q_next /= norm_q_next
+        q_next = q_next / norm_q_next
         
         return q_next
 
