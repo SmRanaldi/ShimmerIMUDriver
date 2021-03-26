@@ -4,8 +4,9 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from visualize_3d_shimmer import visualize_3d
 
-fs = 102.4
+fs = 52.1
 t = 5
 inter_command_delay = 0.5
 com_ports = ['Com5', 'Com8', 'Com9', 'Com12']
@@ -55,7 +56,11 @@ for s in shimmers:
     print(f"Sampling period for Shimmer {s.com_port}: {sampling_period:2f}. Theoretical sampling period: {1/fs:2f}")
     print(f"{data[s.com_port]['SENSOR_A_ACCEL'].shape[0]} samples for shimmer on {s.com_port}.")
     print(f"Gyro error for Shimmer {s.com_port}: {error_value/(180/np.pi)} rad/s")
-
+    print("")
+    print('Calibration parameters: ')
+    print(s.calibration)
+    print("")
+    print("")
     plt.subplot(131)
     for i in range(0,3):
         plt.plot(data[s.com_port]['SENSOR_A_ACCEL'][:,i])
@@ -77,13 +82,14 @@ for s in shimmers:
     r_axis = s.get_axis_angle()
     print(r_axis.shape)
     fig = plt.figure()
-    fig.add_subplot(131, projection='3d')
+    ax = fig.add_subplot(131, projection='3d')
     # plt.plot(ang)
-    plt.plot(r_axis[:,0],r_axis[:,1],r_axis[:,2],'ko')
+    x = np.arange(r_axis.shape[0])
+    ax.scatter(r_axis[:,0],r_axis[:,1],r_axis[:,2],c=x,cmap=plt.cm.viridis)
     plt.plot(0,0,0,'ro',markersize=5)
     plt.title("Axis")
-    fig.add_subplot(132)
-    plt.plot(r_axis[:,3]*(180/np.pi),'k')
+    ax = fig.add_subplot(132)
+    ax.scatter(x, r_axis[:,3]*(180/np.pi),c=x,cmap=plt.cm.viridis)
     plt.title("Angle")
     fig.add_subplot(133)
     plt.plot(ang)
@@ -91,3 +97,7 @@ for s in shimmers:
     plt.show()
 for s in shimmers:
     s.disconnect()
+s = shimmers[0]
+
+# data = s.get_quaternions()
+# visualize_3d(data)

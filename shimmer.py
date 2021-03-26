@@ -3,7 +3,6 @@ import struct
 import serial
 import numpy as np
 import threading
-import time
 import pandas as pd
 import quaternion
 
@@ -13,8 +12,8 @@ class Shimmer:
     baud_rate = 115200
     length_calibration_packet = 21
     NORM_THS = 1e-10
-    # BETA = np.sqrt(3/4) * 0.007# Equation 33 in the paper
-    BETA = 0.05
+    BETA = np.sqrt(3/4) * 0.007# Equation 33 in the paper
+    # BETA = 0.05
 
     sensors_list = {
         # [0] - On command.
@@ -24,9 +23,9 @@ class Shimmer:
         # [4] - Calibration name (if present)
 
         'SENSOR_A_ACCEL': (0x80, 'HHH', 1, 3, 'A_ACCEL'), # Low-noise
-        'SENSOR_MPU9150_GYRO': (0x040, '>hhh', 2, 3, 'GYRO'),
-        'SENSOR_LSM303DLHC_MAG': (0x20, '>hhh', 3, 3, 'MAG'),
-        'SENSOR_GSR': (0x04, 'H', 4, 1, ''),
+        'SENSOR_MPU9150_GYRO': (0x40, '>hhh', 3, 3, 'GYRO'),
+        'SENSOR_LSM303DLHC_MAG': (0x20, '>hhh', 4, 3, 'MAG'),
+        'SENSOR_GSR': (0x04, 'H', 2, 1, ''),
         'SENSOR_EXT_A7': (0x02, 'H', 5, 1, ''),
         'SENSOR_EXT_A6': (0x01, 'H', 6, 1, ''),
         'SENSOR_VBATT': (0x2000, 'H', 7, 1, ''),
@@ -222,7 +221,7 @@ class Shimmer:
         ddata = bytearray()
         ddata = self.connection.read(self.length_calibration_packet)
         self.calibration['GYRO'] = self.unpack_cal_parameters(ddata)
-        self.calibration['GYRO']['sensitivity'] = self.calibration['GYRO']['sensitivity'] / 100 # Correction
+        self.calibration['GYRO']['sensitivity'] = self.calibration['GYRO']['sensitivity']/100
 
         # Magnetometer
         self.connection.write(struct.pack('B', self.commands['GET_MAG_CAL']))
@@ -278,20 +277,20 @@ class Shimmer:
         n_samples = len(self.timestamp)
         orientation_out = []
 
-        acc = np.append(np.zeros((n_samples,1)), self.data_structure['SENSOR_A_ACCEL'], axis=1)
-        gyr = np.append(np.zeros((n_samples,1)), self.data_structure['SENSOR_MPU9150_GYRO'], axis=1)
-        mag = np.append(np.zeros((n_samples,1)), self.data_structure['SENSOR_LSM303DLHC_MAG'], axis=1)
+        acc_tmp = np.append(np.zeros((n_samples,1)), self.memory['SENSOR_A_ACCEL'], axis=1)
+        gyr_tmp = np.append(np.zeros((n_samples,1)), self.memory['SENSOR_MPU9150_GYRO'], axis=1)
+        mag_tmp = np.append(np.zeros((n_samples,1)), self.memory['SENSOR_LSM303DLHC_MAG'], axis=1)
 
-        acc = quaternion.from_float_array(acc)
-        gyr = quaternion.from_float_array(gyr)
-        mag = quaternion.from_float_array(mag)
+        acc = quaternion.from_float_array(acc_tmp)
+        gyr = quaternion.from_float_array(gyr_tmp)
+        mag = quaternion.from_float_array(mag_tmp)
 
         orientation_out.append(np.quaternion(1,0,0,0)) # Initialization
         for i in range(1,n_samples):
             # delta_t = 1/self.sampling_rate
             delta_t = (self.timestamp[i] - self.timestamp[i-1])/1e3 # DT in seconds.
             tmp_orientation = self.get_orientation(acc[i], gyr[i], mag[i], orientation_out[-1], delta_t)
-            orientation_out.append(tmp_orientation)
+            orientation_out.append(tmp_orientation.copy())
 
         return orientation_out[1:]
 
@@ -332,8 +331,8 @@ class Shimmer:
                         [2*BT[1]*(Q[0]*Q[2] + Q[1]*Q[3]) + 2*BT[3]*(0.5 - Q[1]**2 - Q[2]**2) - M[3]]])
 
         # Nabla
-        fgb = np.append(fg, fb, 0)
-        Jgb = np.append(Jg, Jb, 0)
+        fgb = np.append(fg, fb, 0) # 6x1 matrix
+        Jgb = np.append(Jg, Jb, 0) # 6x4 matrix
         f = Jgb.transpose()@fgb
         f = np.quaternion(*f)
         norm_f = quaternion_norm(f)
@@ -355,8 +354,7 @@ class Shimmer:
     def get_euler_angles(self):
         quat = self.get_quaternions()
         angles_out = []
-        for q in quat:
-            angles_out.append(quaternion.as_euler_angles(q))
+        angles_out = [quaternion.as_euler_angles(q) for q in quat]
         return np.array(angles_out)
 
     def get_axis_angle(self):
@@ -366,8 +364,8 @@ class Shimmer:
         for q in quat:
             Q = quaternion.as_float_array(q)
             row = []
-            axis_out.append(Q[1:]/np.sqrt(1-Q[0]**2))
-            angle_out.append(2*np.arccos(Q[0]))
+            axis_out.append((Q[1:]/np.sqrt(1-Q[0]**2)).copy())
+            angle_out.append((2*np.arccos(Q[0])).copy())
         angle_out = np.array(angle_out)
         axis_out = np.array(axis_out)
         return np.concatenate((axis_out,angle_out.reshape(-1,1)), axis=1)
