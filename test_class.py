@@ -99,5 +99,5 @@ for s in shimmers:
     s.disconnect()
 s = shimmers[0]
 
-# data = s.get_quaternions()
-# visualize_3d(data)
+data = s.get_quaternions()
+visualize_3d(data)
