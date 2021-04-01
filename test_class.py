@@ -10,12 +10,17 @@ fs = 52.1
 t = 5
 inter_command_delay = 0.5
 com_ports = ['Com5', 'Com8', 'Com9', 'Com12']
-com_ports = ['Com5']
+com_ports = ['Com9']
 # Com5 -> EA15
 # Com8 -> D3CE
 # Com3 -> EA24 (Check)
 # Com9 -> E46C
 # Com12 -> E91F
+
+# On linux, first bind the port:
+# > sudo rfcomm N_PORT MAC_ADDRESS CHANNEL=1
+# then update permissions
+# > sudo chmod 666/dev/rfcomm{N_PORT}
 
 output_path = 'test_data'
 if not os.path.exists(output_path):
@@ -41,13 +46,14 @@ print('Press enter to stop acquisition...')
 input('')
 for s in shimmers:
     s.stop()
+    s.disconnect()
 
 data = {}
 l = []
 for s in shimmers:
     data[s.com_port] = s.get_last_data()
-    s.save_last_data(output_path + '/data_'+s.com_port+'.csv')
-    s.save_quaternions(output_path+'/quaternions_'+s.com_port+'.csv')
+    s.save_last_data(output_path + '/data_'+s.com_port.replace("/","")+'.csv')
+    s.save_quaternions(output_path+'/quaternions_'+s.com_port.replace("/","")+'.csv')
     l.append(data[s.com_port]['SENSOR_A_ACCEL'].shape[0])
 
     sampling_period = np.mean(np.diff(s.timestamp)/1000)
@@ -95,8 +101,6 @@ for s in shimmers:
     plt.plot(ang)
     plt.title("Euler angles")
     plt.show()
-for s in shimmers:
-    s.disconnect()
 s = shimmers[0]
 
 data = s.get_quaternions()

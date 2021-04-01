@@ -1,6 +1,7 @@
 ﻿name: shimmer_driver
 channels:
   - defaults
+  - conda-forge
 dependencies:
   - scipy
   - matplotlib

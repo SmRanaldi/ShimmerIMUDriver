@@ -115,7 +115,7 @@ class Shimmer:
     # ----- Public methods -----
     def connect(self):
         try:
-            self.connection = serial.Serial(self.com_port, self.baud_rate)
+            self.connection = serial.Serial(self.com_port, self.baud_rate, timeout=5) # Check here, timeout must be larger for Windows systems
             self.connection.flushInput()
             print(f'Port opened for shimmer {self.com_port}')
         except:
