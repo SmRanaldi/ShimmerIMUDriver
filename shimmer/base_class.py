@@ -6,8 +6,13 @@ import threading
 import pandas as pd
 import quaternion
 import json
+import os
 
-class Shimmer:
+# from .settings.commands import sensors_list, commands
+
+BASE_PATH = "\\".join(os.path.abspath(__file__).split("\\")[:-1])
+
+class ShimmerBaseClass:
 
     # ----- Parameters -----
     baud_rate = 115200
@@ -16,17 +21,17 @@ class Shimmer:
     BETA = np.sqrt(3/4) * 0.007# Equation 33 in the paper
     # BETA = 0.05
 
-    with open('settings/sensors_list.json','r') as f:
+    with open(os.path.join(BASE_PATH+'\\config\\sensors_list.json'),'r') as f:
         sensors_list = json.load(f)
 
-    # Order of the parameters for each sensor in sensors_list
-    # [0] - ON COMMAND.
-    # [1] - DATA PACKET FORMAT
-    # [2] - ORDER IN PAYLOAD (NOT SURE)
-    # [3] - NUMBER OF CHANNELS
-    # [4] - CALIBRATION NAME (IF PRESENT)
+    # # Order of the parameters for each sensor in sensors_list
+    # # [0] - ON COMMAND.
+    # # [1] - DATA PACKET FORMAT
+    # # [2] - ORDER IN PAYLOAD (NOT SURE)
+    # # [3] - NUMBER OF CHANNELS
+    # # [4] - CALIBRATION NAME (IF PRESENT)
     
-    with open('settings/commands.json','r') as f:
+    with open(os.path.join(BASE_PATH+'\\config\\commands.json'),'r') as f:
         commands = json.load(f)
 
     # ----- Constructor -----

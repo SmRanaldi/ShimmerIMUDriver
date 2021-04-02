@@ -1,5 +1,5 @@
 import quaternion
-from shimmer import Shimmer
+from shimmer.base_class import ShimmerBaseClass
 import time
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,7 +27,7 @@ if not os.path.exists(output_path):
     os.makedirs(output_path)
 
 sensors_to_enable = ['SENSOR_MPU9150_GYRO','SENSOR_A_ACCEL', 'SENSOR_LSM303DLHC_MAG']
-shimmers = [Shimmer(x, sensors_to_enable, fs) for x in com_ports]
+shimmers = [ShimmerBaseClass(x, sensors_to_enable, fs) for x in com_ports]
 print('Connecting...')
 for s in shimmers:
     s.connect()
@@ -62,10 +62,6 @@ for s in shimmers:
     print(f"Sampling period for Shimmer {s.com_port}: {sampling_period:2f}. Theoretical sampling period: {1/fs:2f}")
     print(f"{data[s.com_port]['SENSOR_A_ACCEL'].shape[0]} samples for shimmer on {s.com_port}.")
     print(f"Gyro error for Shimmer {s.com_port}: {error_value/(180/np.pi)} rad/s")
-    print("")
-    print('Calibration parameters: ')
-    print(s.calibration)
-    print("")
     print("")
     plt.subplot(131)
     for i in range(0,3):
