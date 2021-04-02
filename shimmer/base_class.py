@@ -10,7 +10,8 @@ import os
 
 # from .settings.commands import sensors_list, commands
 
-BASE_PATH = "\\".join(os.path.abspath(__file__).split("\\")[:-1])
+BASE_PATH = os.path.split(os.path.abspath(__file__))[0]
+CONFIG_PATH = os.path.join(BASE_PATH,"config")
 
 class ShimmerBaseClass:
 
@@ -21,7 +22,7 @@ class ShimmerBaseClass:
     BETA = np.sqrt(3/4) * 0.007# Equation 33 in the paper
     # BETA = 0.05
 
-    with open(os.path.join(BASE_PATH+'\\config\\sensors_list.json'),'r') as f:
+    with open(os.path.join(CONFIG_PATH,"sensors_list.json"),'r') as f:
         sensors_list = json.load(f)
 
     # # Order of the parameters for each sensor in sensors_list
@@ -31,7 +32,7 @@ class ShimmerBaseClass:
     # # [3] - NUMBER OF CHANNELS
     # # [4] - CALIBRATION NAME (IF PRESENT)
     
-    with open(os.path.join(BASE_PATH+'\\config\\commands.json'),'r') as f:
+    with open(os.path.join(CONFIG_PATH,"commands.json"),'r') as f:
         commands = json.load(f)
 
     # ----- Constructor -----
