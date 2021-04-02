@@ -1,9 +1,5 @@
 from shimmer.base_class import ShimmerBaseClass
-import sys
-import struct
-import serial
 import numpy as np
-import threading
 import pandas as pd
 import quaternion
 import json
@@ -15,32 +11,25 @@ class ShimmerQuaternion(ShimmerBaseClass):
 
         enabled_sensors = ['SENSOR_A_ACCEL', 'SENSOR_MPU9150_GYRO', 'SENSOR_LSM303DLHC_MAG']
         super().__init__(com_port, enabled_sensors, sampling_rate)
-        self.processing_loop = threading.Thread(target = self.__processing_loop__)
         self.quaternions = []
         self.delta_t = 1./self.sampling_rate
 
 # ----- Core function override -----
 
-    def __processing_loop__(self):
-        while self.is_running * self.is_recording:
-            print("aaa")
-            if self.data_structure[self.enabled_sensors[0]].shape[0] == self.data_structure[self.enabled_sensors[-1]].shape[0]: 
-                print("bbb")
-                acc = self.calibrate_channel(self.data_structure['SENSOR_A_ACCEL'][:,[-1]], self.calibration[self.sensors_list['SENSOR_A_ACCEL'][4]])[:,0]
-                gyr = self.calibrate_channel(self.data_structure['SENSOR_MPU9150_GYRO'][:,[-1]], self.calibration[self.sensors_list['SENSOR_MPU9150_GYRO'][4]])[:,0]
-                mag = self.calibrate_channel(self.data_structure['SENSORLSM303DLHC_MAG'][:,[-1]], self.calibration[self.sensors_list['SENSOR_LSM303DLHC_MAG'][4]])[:,0]
-                acc = np.append(np.zeros((n_samples,1)), acc, axis=1)
-                gyr = np.append(np.zeros((n_samples,1)), gyr, axis=1)
-                mag = np.append(np.zeros((n_samples,1)), mag, axis=1)
+    def __processing_function__(self):
+        acc = self.calibrate_channel(np.array([self.data_structure['SENSOR_A_ACCEL'][-1]]), self.calibration[self.sensors_list['SENSOR_A_ACCEL'][4]])
+        gyr = self.calibrate_channel(np.array([self.data_structure['SENSOR_MPU9150_GYRO'][-1]]), self.calibration[self.sensors_list['SENSOR_MPU9150_GYRO'][4]])
+        mag = self.calibrate_channel(np.array([self.data_structure['SENSOR_LSM303DLHC_MAG'][-1]]), self.calibration[self.sensors_list['SENSOR_LSM303DLHC_MAG'][4]])
+        acc = quaternion.from_float_array(np.append(np.zeros((1,1)), acc, axis=1))
+        gyr = quaternion.from_float_array(np.append(np.zeros((1,1)), gyr, axis=1))
+        mag = quaternion.from_float_array(np.append(np.zeros((1,1)), mag, axis=1))
 
-                if self.quaternions:
-                    tmp_orientation = self.get_orientation(acc, gyr, mag, orientation_out[-1], self.delta_t)
-                else:
-                    tmp_orientation = self.get_orientation(acc, gyr, mag, np.quaternion(1,0,0,0), self.delta_t)
+        if self.quaternions:
+            tmp_orientation = self.get_orientation(acc[0], gyr[0], mag[0], self.quaternions[-1], self.delta_t)
+        else:
+            tmp_orientation = self.get_orientation(acc[0], gyr[0], mag[0], np.quaternion(1,0,0,0), self.delta_t)
 
-                self.quaternions.append(tmp_orientation.copy())
-
-                print(tmp_orientation)
+        self.quaternions.append(tmp_orientation.copy())
 
 # ----- Public methods -----
 

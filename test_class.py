@@ -79,7 +79,6 @@ for s in shimmers:
 min_l = np.min(l)
 
 for s in shimmers:
-    print(s.quaternions)
     ang = s.get_euler_angles()
     ang *= 180/np.pi
     r_axis = s.get_axis_angle()
@@ -100,5 +99,5 @@ for s in shimmers:
     plt.show()
 s = shimmers[0]
 
-data = s.get_quaternions()
+data = s.quaternions
 visualize_3d(data)

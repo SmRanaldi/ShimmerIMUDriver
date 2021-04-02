@@ -45,7 +45,6 @@ class ShimmerBaseClass:
         self.data_structure = {sens: [] for sens in enabled_sensors}
         self.timestamp = []
         self.loop = threading.Thread(target = self.__core_loop__)
-        self.processing_loop = threading.Thread(target = self.__processing_loop__)
         self.is_running = 0
         self.is_ready = 0
         self.is_recording = 0
@@ -81,15 +80,16 @@ class ShimmerBaseClass:
                             ddata[ch_idx : ch_idx+ buff_size])))
                         ch_idx += buff_size
 
+                    self.__processing_function__()
+
                 next_byte = self.connection.read(1)
                 if next_byte == struct.pack('B', 0xFF):
                     # Discard all the utility packets
                     while next_byte != struct.pack('B', 0x00):
                         next_byte = self.connection.read(1)
 
-    def __processing_loop__(self):
-        while self.is_recording * self.is_running:
-            pass
+    def __processing_function__(self):
+        pass
 
     # ----- Public methods -----
     def connect(self):
@@ -138,7 +138,6 @@ class ShimmerBaseClass:
         self.__wait_for_ack__()
         self.is_running = 1
         self.loop.start()
-        self.processing_loop.start()
         print(f'Shimmer {self.com_port} ready.')
 
     def start(self):
@@ -175,7 +174,6 @@ class ShimmerBaseClass:
 
     def disconnect(self):
         self.loop.join()
-        self.processing_loop.join()
         self.connection.write(struct.pack('B', self.commands['STOP']))
         self.__wait_for_ack__()
         self.connection.close()
