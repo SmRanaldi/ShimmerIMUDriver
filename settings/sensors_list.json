@@ -1,0 +1,135 @@
+{
+    "SENSOR_A_ACCEL": [
+        128,
+        "HHH",
+        1,
+        3,
+        "A_ACCEL"
+    ],
+    "SENSOR_MPU9150_GYRO": [
+        64,
+        ">hhh",
+        3,
+        3,
+        "GYRO"
+    ],
+    "SENSOR_LSM303DLHC_MAG": [
+        32,
+        ">hhh",
+        4,
+        3,
+        "MAG"
+    ],
+    "SENSOR_GSR": [
+        4,
+        "H",
+        2,
+        1,
+        ""
+    ],
+    "SENSOR_EXT_A7": [
+        2,
+        "H",
+        5,
+        1,
+        ""
+    ],
+    "SENSOR_EXT_A6": [
+        1,
+        "H",
+        6,
+        1,
+        ""
+    ],
+    "SENSOR_VBATT": [
+        8192,
+        "H",
+        7,
+        1,
+        ""
+    ],
+    "SENSOR_D_ACCEL": [
+        4096,
+        "hhh",
+        8,
+        3,
+        "D_ACCEL"
+    ],
+    "SENSOR_EXT_A15": [
+        2048,
+        "H",
+        9,
+        1,
+        ""
+    ],
+    "SENSOR_INT_A1": [
+        1024,
+        "H",
+        10,
+        1,
+        ""
+    ],
+    "SENSOR_INT_A12": [
+        512,
+        "H",
+        11,
+        1,
+        ""
+    ],
+    "SENSOR_INT_A13": [
+        256,
+        "H",
+        12,
+        1,
+        ""
+    ],
+    "SENSOR_INT_A14": [
+        8388608,
+        "H",
+        13,
+        1,
+        ""
+    ],
+    "SENSOR_BMP180_PRESSURE": [
+        262144,
+        ">II",
+        14,
+        2,
+        ""
+    ],
+    "SENSOR_EXG1_24BIT": [
+        16,
+        ">ii",
+        15,
+        2,
+        ""
+    ],
+    "SENSOR_EXG2_24BIT": [
+        8,
+        ">ii",
+        16,
+        2,
+        ""
+    ],
+    "SENSOR_EXG1_16BIT": [
+        1048576,
+        ">hh",
+        17,
+        2,
+        ""
+    ],
+    "SENSOR_EXG2_16BIT": [
+        524288,
+        ">hh",
+        18,
+        2,
+        ""
+    ],
+    "SENSOR_BRIDGE_AMP": [
+        32768,
+        "HH",
+        19,
+        2,
+        ""
+    ]
+}

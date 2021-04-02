@@ -1,0 +1,14 @@
+{
+    "SET_SENSOR_COMMAND": 8,
+    "SET_SAMPLING_RATE": 5,
+    "START": 112,
+    "STOP": 32,
+    "GET_A_ACCEL_CAL": 19,
+    "GET_GYRO_CAL": 22,
+    "GET_MAG_CAL": 25,
+    "GET_D_ACCEL_CAL": 28,
+    "A_ACCEL_CAL_ACK": 18,
+    "GYRO_CAL_ACK": 21,
+    "MAG_CAL_ACK": 24,
+    "D_ACCEL_CAL_ACK": 27
+}
