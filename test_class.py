@@ -1,5 +1,5 @@
 import quaternion
-from shimmer.base_class import ShimmerBaseClass
+from shimmer.shimmer_quaternion import ShimmerQuaternion
 import time
 import matplotlib.pyplot as plt
 import numpy as np
@@ -27,7 +27,7 @@ if not os.path.exists(output_path):
     os.makedirs(output_path)
 
 sensors_to_enable = ['SENSOR_MPU9150_GYRO','SENSOR_A_ACCEL', 'SENSOR_LSM303DLHC_MAG']
-shimmers = [ShimmerBaseClass(x, sensors_to_enable, fs) for x in com_ports]
+shimmers = [ShimmerQuaternion(x, fs) for x in com_ports]
 print('Connecting...')
 for s in shimmers:
     s.connect()
@@ -79,6 +79,7 @@ for s in shimmers:
 min_l = np.min(l)
 
 for s in shimmers:
+    print(s.quaternions)
     ang = s.get_euler_angles()
     ang *= 180/np.pi
     r_axis = s.get_axis_angle()

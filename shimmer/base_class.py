@@ -39,15 +39,13 @@ class ShimmerBaseClass:
     def __init__(self, com_port, enabled_sensors, sampling_rate):
         self.com_port = com_port
         self.quaternion_recording = 0
-        if 'QUATERNION' in enabled_sensors:
-            self.quaternion_recording = 1
-            enabled_sensors = ['SENSOR_A_ACCEL', 'SENSOR_MPU9150_GYRO', 'SENSOR_LSM303DLHC_MAG']
         enabled_sensors = sorted(enabled_sensors, key = lambda x: self.sensors_list[x][2])
         self.enabled_sensors = [x for x in enabled_sensors if x in list(self.sensors_list.keys())]
         self.sampling_rate = sampling_rate
         self.data_structure = {sens: [] for sens in enabled_sensors}
         self.timestamp = []
         self.loop = threading.Thread(target = self.__core_loop__)
+        self.processing_loop = threading.Thread(target = self.__processing_loop__)
         self.is_running = 0
         self.is_ready = 0
         self.is_recording = 0
@@ -88,6 +86,10 @@ class ShimmerBaseClass:
                     # Discard all the utility packets
                     while next_byte != struct.pack('B', 0x00):
                         next_byte = self.connection.read(1)
+
+    def __processing_loop__(self):
+        while self.is_recording * self.is_running:
+            pass
 
     # ----- Public methods -----
     def connect(self):
@@ -136,6 +138,7 @@ class ShimmerBaseClass:
         self.__wait_for_ack__()
         self.is_running = 1
         self.loop.start()
+        self.processing_loop.start()
         print(f'Shimmer {self.com_port} ready.')
 
     def start(self):
@@ -172,6 +175,7 @@ class ShimmerBaseClass:
 
     def disconnect(self):
         self.loop.join()
+        self.processing_loop.join()
         self.connection.write(struct.pack('B', self.commands['STOP']))
         self.__wait_for_ack__()
         self.connection.close()
@@ -245,104 +249,3 @@ class ShimmerBaseClass:
             return data_out[1:,:]
         else:
             return data_in
-    
-    def get_quaternions(self):
-
-        if not self.memory:
-            self.get_last_data()
-
-        n_samples = len(self.timestamp)
-        orientation_out = []
-
-        acc_tmp = np.append(np.zeros((n_samples,1)), self.memory['SENSOR_A_ACCEL'], axis=1)
-        gyr_tmp = np.append(np.zeros((n_samples,1)), self.memory['SENSOR_MPU9150_GYRO'], axis=1)
-        mag_tmp = np.append(np.zeros((n_samples,1)), self.memory['SENSOR_LSM303DLHC_MAG'], axis=1)
-
-        acc = quaternion.from_float_array(acc_tmp)
-        gyr = quaternion.from_float_array(gyr_tmp)
-        mag = quaternion.from_float_array(mag_tmp)
-
-        orientation_out.append(np.quaternion(1,0,0,0)) # Initialization
-        for i in range(1,n_samples):
-            # delta_t = 1/self.sampling_rate
-            delta_t = (self.timestamp[i] - self.timestamp[i-1])/1e3 # DT in seconds.
-            tmp_orientation = self.get_orientation(acc[i], gyr[i], mag[i], orientation_out[-1], delta_t)
-            orientation_out.append(tmp_orientation.copy())
-
-        return orientation_out[1:]
-
-    def get_orientation(self, a, g, m, q, dt):
-
-        # beta = 0.03
-        quaternion_norm = lambda x: np.sqrt(np.sum([c**2 for c in quaternion.as_float_array(x)])) 
-
-        norm_a = quaternion_norm(a)
-        if norm_a > self.NORM_THS: a = a / norm_a
-        norm_m = quaternion_norm(m)
-        if norm_m > self.NORM_THS: m = m / norm_m
-        # norm_q = quaternion_norm(q)
-        # if norm_q > self.NORM_THS: a /= norm_q
-
-        g /= (180/np.pi) # Get gyro data in radians/s
-
-        ht = quaternion.as_float_array(q * m * q.conj())
-        bt = np.quaternion(0, np.sqrt(ht[1]**2 + ht[2]**2), 0, ht[3])
-        BT = quaternion.as_float_array(bt)
-        Q = quaternion.as_float_array(q)
-        M = quaternion.as_float_array(m)
-        A = quaternion.as_float_array(a)
-
-        # Arrays for gradient descent. If there's a bug in the code, it 
-        # is probably here.
-        Jb = np.array([[-2*BT[3]*Q[2], 2*BT[3]*Q[3], -4*BT[1]*Q[2] - 2*BT[3]*Q[0], -4*BT[1]*Q[3] + 2*BT[3]*Q[1]],
-                        [-2*BT[1]*Q[3] + 2*BT[3]*Q[1], 2*BT[1]*Q[2] + 2*BT[3]*Q[0], 2*BT[1]*Q[1] + 2*BT[3]*Q[3], -2*BT[1]*Q[0] + 2*BT[3]*Q[2]],
-                        [2*BT[1]*Q[2], 2*BT[1]*Q[3] - 4*BT[3]*Q[1], 2*BT[1]*Q[0] - 4*BT[3]*Q[2], 2*BT[1]*Q[1]]])
-        Jg = np.array([[-2*Q[2], 2*Q[3], -2*Q[0], 2*Q[1]],
-                        [2*Q[1], 2*Q[0], 2*Q[3], 2*Q[2]],
-                        [0, -4*Q[1], -4*Q[2], 0]])
-        fg = np.array([[2*(Q[1]*Q[3] - Q[0]*Q[2]) - A[1]],
-                       [2*(Q[0]*Q[1] + Q[2]*Q[3]) - A[2]],
-                       [2*(0.5 - Q[1]**2 - Q[2]**2) - A[3]]])
-        fb = np.array([[2*BT[1]*(0.5 - Q[2]**2 - Q[3]**2) + 2*BT[3]*(Q[1]*Q[3] - Q[0]*Q[2]) - M[1]],
-                        [2*BT[1]*(Q[1]*Q[2] - Q[0]*Q[3]) + 2*BT[3]*(Q[0]*Q[1] + Q[2]*Q[3]) - M[2]],
-                        [2*BT[1]*(Q[0]*Q[2] + Q[1]*Q[3]) + 2*BT[3]*(0.5 - Q[1]**2 - Q[2]**2) - M[3]]])
-
-        # Nabla
-        fgb = np.append(fg, fb, 0) # 6x1 matrix
-        Jgb = np.append(Jg, Jb, 0) # 6x4 matrix
-        f = Jgb.transpose()@fgb
-        f = np.quaternion(*f)
-        norm_f = quaternion_norm(f)
-        f = f / norm_f
-        # if norm_f > self.NORM_THS: f /= norm_f
-
-        # Eq. 30 in the paper
-        q_dot = 0.5 * q * g - self.BETA*f
-        q_next = q + dt*q_dot
-        norm_q_next = quaternion_norm(q_next)
-        q_next = q_next / norm_q_next
-        
-        return q_next
-
-    def save_quaternions(self, filename):
-        quat = pd.DataFrame(quaternion.as_float_array(self.get_quaternions()))
-        quat.to_csv(filename)
-
-    def get_euler_angles(self):
-        quat = self.get_quaternions()
-        angles_out = []
-        angles_out = [quaternion.as_euler_angles(q) for q in quat]
-        return np.array(angles_out)
-
-    def get_axis_angle(self):
-        quat = self.get_quaternions()
-        axis_out = []
-        angle_out = []
-        for q in quat:
-            Q = quaternion.as_float_array(q)
-            row = []
-            axis_out.append((Q[1:]/np.sqrt(1-Q[0]**2)).copy())
-            angle_out.append((2*np.arccos(Q[0])).copy())
-        angle_out = np.array(angle_out)
-        axis_out = np.array(axis_out)
-        return np.concatenate((axis_out,angle_out.reshape(-1,1)), axis=1)
