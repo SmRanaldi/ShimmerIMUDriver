@@ -8,7 +8,6 @@ import quaternion
 import json
 import os
 
-# from .settings.commands import sensors_list, commands
 
 BASE_PATH = os.path.split(os.path.abspath(__file__))[0]
 CONFIG_PATH = os.path.join(BASE_PATH,"config")
@@ -20,7 +19,6 @@ class ShimmerBaseClass:
     length_calibration_packet = 21
     NORM_THS = 1e-10
     BETA = np.sqrt(3/4) * 0.007# Equation 33 in the paper
-    # BETA = 0.05
 
     with open(os.path.join(CONFIG_PATH,"sensors_list.json"),'r') as f:
         sensors_list = json.load(f)
@@ -221,8 +219,6 @@ class ShimmerBaseClass:
         ddata = bytearray()
         ddata = self.connection.read(self.length_calibration_packet)
         self.calibration['D_ACCEL'] = self.unpack_cal_parameters(ddata)
-
-        # print(self.calibration)
 
     def unpack_cal_parameters(self, ddata_in):
         # Bytes 0-5 -> 3 offset values (16 bit unsigned int, big endian)
