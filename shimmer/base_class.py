@@ -92,7 +92,7 @@ class ShimmerBaseClass:
     # ----- Public methods -----
     def connect(self):
         try:
-            self.connection = serial.Serial(self.com_port, self.baud_rate, timeout=5) # Check here, timeout must be larger for Windows systems
+            self.connection = serial.Serial(self.com_port, self.baud_rate, timeout=10) # Check here, timeout must be larger for Windows systems
             self.connection.flushInput()
             print(f'Port opened for shimmer {self.com_port}')
         except:
@@ -209,6 +209,7 @@ class ShimmerBaseClass:
         ddata = bytearray()
         ddata = self.connection.read(self.length_calibration_packet)
         self.calibration['MAG'] = self.unpack_cal_parameters(ddata)
+        # self.calibration['MAG']['alignment'] = self.calibration['MAG']['alignment'][[2,1,0],:] # Test swap channels
 
         # WR Accel
         self.connection.write(struct.pack('B', self.commands['GET_D_ACCEL_CAL']))

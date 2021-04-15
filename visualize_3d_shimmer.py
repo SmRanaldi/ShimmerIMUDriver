@@ -4,7 +4,6 @@ import quaternion
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import mpl_toolkits.mplot3d.axes3d as p3
-import os
 
 def visualize_3d(quaternion_in):
 
