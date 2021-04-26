@@ -5,7 +5,7 @@ fs = 52.1
 t = 5
 inter_command_delay = 0.5
 com_ports = ['Com5', 'Com8', 'Com9', 'com12']
-com_ports = ['Com5']
+com_ports = ['Com9']
 # com5 -> ea15
 # com8 -> d3ce
 # com3 -> ea24 (check)
