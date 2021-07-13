@@ -1,5 +1,5 @@
 import quaternion
-from shimmer.base_class import ShimmerBaseClass
+from shimmer.shimmer_quaternion import ShimmerQuaternion
 import time
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,7 +10,7 @@ fs = 52.1
 t = 5
 inter_command_delay = 0.5
 com_ports = ['Com5', 'Com8', 'Com9', 'Com12']
-com_ports = ['Com9']
+com_ports = ['Com5']
 # Com5 -> EA15
 # Com8 -> D3CE
 # Com3 -> EA24 (Check)
@@ -27,7 +27,7 @@ if not os.path.exists(output_path):
     os.makedirs(output_path)
 
 sensors_to_enable = ['SENSOR_MPU9150_GYRO','SENSOR_A_ACCEL', 'SENSOR_LSM303DLHC_MAG']
-shimmers = [ShimmerBaseClass(x, sensors_to_enable, fs) for x in com_ports]
+shimmers = [ShimmerQuaternion(x, fs) for x in com_ports]
 print('Connecting...')
 for s in shimmers:
     s.connect()
@@ -99,5 +99,5 @@ for s in shimmers:
     plt.show()
 s = shimmers[0]
 
-data = s.get_quaternions()
+data = s.quaternions
 visualize_3d(data)
