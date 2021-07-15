@@ -18,7 +18,7 @@ class ShimmerBaseClass:
     baud_rate = 115200
     length_calibration_packet = 21
     NORM_THS = 1e-10
-    BETA = np.sqrt(3/4) * 0.007# Equation 33 in the paper
+    BETA = np.sqrt(3/4) * 0.003# Equation 33 in the paper
 
     with open(os.path.join(CONFIG_PATH,"sensors_list.json"),'r') as f:
         sensors_list = json.load(f)
