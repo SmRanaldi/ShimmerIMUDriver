@@ -28,7 +28,7 @@ for s in shimmers:
     s.connect()
 print('initializing ...')
 for s in shimmers:
-    c = 0;
+    c = 0
     while not s.is_running and c<10:
         s.initialize()
         c += 1
